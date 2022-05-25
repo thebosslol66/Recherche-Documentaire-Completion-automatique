@@ -1,16 +1,38 @@
-import time
+#!/usr/bin/env python3.10
+
+"""
+Regroup all functions for display and loading data easly.
+It have functions to print levenstein table and jaro table.
+It have too a function to compare all algorithms for distance editing
+"""
+
+import os, time, random, multiprocessing
 import numpy as np
 import matplotlib.pylab as plt
 import matplotlib.patches as mpatches
 from IPython.display import display, HTML
-from ipywidgets import widgets, interact, interactive, fixed, interact_manual
+from ipywidgets import widgets, interactive, fixed
 import pandas as pd
-import os
-import multiprocessing
+import typing
 
-custom_size = None
 
-def setWidgetTextSize(value):
+DistanceFunctionVar = typing.TypeVar('DistanceFunctionVar', bound=typing.Callable[[str], typing.Callable[[str], float]])
+PreTrainedPredictionVar =typing.TypeVar('PreTrainedPredictionVar', bound=typing.Callable[[typing.Callable[[str], typing.Callable[[str], float]], str, typing.Optional[str], typing.Optional[typing.Callable[[float], float]]], typing.Tuple[pd.DataFrame, float]])
+
+
+"""Store the htrml elemnt for the widgets font size"""
+custom_size :HTML = None
+
+def setWidgetTextSize(value :int) -> None:
+    """
+    Set the size of text widget to he a better render
+    
+    Parameters:
+        value (int):
+            0: Normal size
+            1: Littel bigger for convinience
+            2: The bigger for big letters
+    """
     global custom_size
     if value == 0:
         font_size = "15px"
@@ -34,7 +56,19 @@ def setWidgetTextSize(value):
         custom_size.value = html_value
         
 
-def import_data(filename):
+def import_data(filename :str) -> pd.DataFrame:
+    """
+    Load sata from a csv file and get it as a pandas.DataFame.
+    It shows an ipywidget.IntProgress during loading of data. 
+    
+    Parameters:
+        filename (str):
+            Retreive the data from the file
+
+    Returns:
+        (pd.DataFrame):
+            The data from file name loaded in a pandas.DataFrame.
+    """
     temp = pd.read_csv(filename, nrows=20)
     N = len(temp.to_csv(index=False))
     df = [temp[:0]]
@@ -60,7 +94,20 @@ def import_data(filename):
     del df, temp
     return res
 
-def delete_useless_word_in_pd(data):
+def delete_useless_word_in_pd(data :pd.DataFrame) -> pd.DataFrame:
+    """
+    Delete lines wich contain multiple times the same word in the column 'ortho'
+    and lines with ortho word length less than 3 chars
+    
+    Parameters:
+        data (pandas.DataFrame):
+            A dataframe containing a colulmn 'ortho'
+
+    Returns:
+        (pandas.DataFrame):
+            The data without duplicate lines containing the same word in column 'ortho'
+            and without word less than 3 Char
+    """
     data = data[["ortho"]]
     data = data.drop_duplicates(["ortho"], keep="first").reset_index(drop=True)
     data = data[data["ortho"].str.len() > 2].reset_index(drop=True)
@@ -69,19 +116,22 @@ def delete_useless_word_in_pd(data):
 
 
 
-def chrono(fonction):
-    """Chronométre le temps mis par la fonction"""
+def chrono(fonction :typing.Callable[[list, dict], typing.Tuple[typing.Any, float]]):
+    """
+    Get time used for executing a function it returns it as a tuple of
+    result of function and time elapsed
+    """
 
-    def wrapper(*args, **kwargs):
+    def wrapper(*args :list, **kwargs : dict) -> typing.Tuple[typing.Any, float]:
         temps_debut = time.time()
         y = fonction(*args, **kwargs)
         return y, time.time() - temps_debut
 
     return wrapper
 
-def getPredictionsFromDict(word_dict):
+def getPredictionsFromDict(word_dict :pd.DataFrame) -> PreTrainedPredictionVar:
     @chrono
-    def getPredictions(funct, word, start="", mofier_funct=lambda x: x):
+    def getPredictions(funct :DistanceFunctionVar, word :str, start :str ="", mofier_funct : typing.Callable[[float], float] =lambda x: x) -> pd.DataFrame:
         word = word.lower()
         start = start.lower()
         f = funct(word)
@@ -100,7 +150,20 @@ def getPredictionsFromDict(word_dict):
         return results
     return getPredictions
 
-def showLevensteinTable(title_text, c1, c2, data):
+def showLevensteinTable(title_text :str, c1 :str, c2 :str, data : typing.List[typing.List[int]]) -> None:
+    """
+    Show a levenstein table for word c1 and c2 with a table containing data
+    
+    Parameters:
+        title_text (str):
+            The title of the draw table 
+        c1 (str):
+            The word compared
+        c2 (str):
+            The word to compare
+        data (list[list[int]]):
+            The levenstein table between c1 and c2
+    """
 
     column_headers = list(" " + c1)
     row_headers = list(" " + c2)
@@ -186,12 +249,34 @@ def showLevensteinTable(title_text, c1, c2, data):
         )
 
     plt.axis("off")
-    #ax.set_title(title_text)
-    plt.savefig(title_text.replace(" ", "_") + ".png")
+    ax.set_title(title_text)
+    #plt.savefig(title_text.replace(" ", "_") + ".png")
     plt.show()
 
 
-def showJaroTable(title_text, c1, c2, Winkler=False, **kwargs):
+def showJaroTable(title_text :str, c1 :str, c2 :str, Winkler :bool =False, **kwargs :typing.Dict[str, typing.Any]) -> None:
+    """
+    Show a Jaro table for word c1 and c2
+    It displays math associated
+    
+    Parameters:
+        title_text (str):
+            The title of the draw table 
+        c1 (str):
+            The word compared
+        c2 (str):
+            The word to compare
+        Winkler (bool):
+            If it needs to display calcs associated to the distance Jaro-Winkler
+        kwargs (typing.Dict[str, typing.Any]):
+            Additional settings for the winkler calcs
+            p (float):
+                The number p used by buy the algorythm Jaro-Winkler
+            threshold (float):
+                The threshold used fo calculating the l when it's upper
+            l (int):
+                The length of common prefix
+    """
 
     column_headers = list(c1)
     row_headers = list(c2)
@@ -319,19 +404,39 @@ def showJaroTable(title_text, c1, c2, Winkler=False, **kwargs):
 
     ax[0].axis("off")
     ax[1].axis("off")
-    #ax[0].set_title(title_text)
-    plt.savefig(title_text.replace(" ", "_") + ".png")
+    ax[0].set_title(title_text)
+    #plt.savefig(title_text.replace(" ", "_") + ".png")
     plt.show()
     
 
-### Fonctions to display and show comparaison between results of different algorithms
-def assign_label_to_func(f, rowNb):
+def assign_label_to_func(getPredictions :PreTrainedPredictionVar, f :DistanceFunctionVar, rowNb :int) -> typing.Callable[[str, typing.Any], None]:
+    """
+    Assign a function to a group of label and apply a getPrediction function to search 3 best words
+    
+    Parameters:
+        getPredictions (typing.Callable[[typing.Callable[[str], typing.Callable[[str], float]], str, typing.Optional[str], typing.Optional[typing.Callable[[float], float]]], typing.Tuple[pd.DataFrame, float]]):
+            The fonction getPrediction already configured with a dict
+        f (typing.Callable[[str], typing.Callable[[str], float]]):
+            The function to calculate a distance between 2 word
+
+    Returns:
+        (typing.Callable[[str, typing.Any], None]):
+            The fonction wich calculate the best 3 result for the algorithm and put it's result into the DictProxy.
+    """
     modifier = lambda x: x
     if f.__name__ == "DistanceDeJaro" or f.__name__ == "DistanceDeJaroWinkler":
         modifier = lambda x: 1 - x
 
-    def funct(word, return_dict):
-
+    def funct(word :str, return_dict :typing.Dict) -> None:
+        """
+        Calculate best 3 result for comparate word with all other word in preload function getPrediction and put result in the DictProxy
+    
+    Parameters:
+        word (str):
+            The word to seach the best same word in getPrediction
+        return_dict (multiprocessing.managers.DictProxy):
+            The dict to put results
+    """
         if len(word) < 2:
             return
 
@@ -346,16 +451,16 @@ def assign_label_to_func(f, rowNb):
     return funct
 
 
-def setup_autocomplete(grid, algos):
+def setup_autocomplete(getPredictions :PreTrainedPredictionVar, grid :widgets.GridspecLayout, algos :typing.Sequence[DistanceFunctionVar]) -> typing.Callable[[widgets.widget_string.Text], None]:
     funct_list = list()
     for index, algo in enumerate(algos):
-        funct_list.append(assign_label_to_func(algo, index+1))
+        funct_list.append(assign_label_to_func(getPredictions, algo, index+1))
 
     shared_dict = multiprocessing.Manager().dict()
 
     last_send_value = widgets.widget_string.Text()
 
-    def funct(sender):
+    def funct(sender :widgets.widget_string.Text) -> None:
         v = sender.value.split(' ')[-1]
         if last_send_value.value == v:
             return
@@ -380,7 +485,7 @@ def setup_autocomplete(grid, algos):
 
     return funct
 
-def displayComparaisonInterface(*args):
+def displayComparaisonInterface(getPredictions :PreTrainedPredictionVar, *args :typing.Sequence[DistanceFunctionVar]):
     grid = widgets.GridspecLayout(len(args)+1, 5)
     
     def formatAlgoName(funct):
@@ -408,8 +513,80 @@ def displayComparaisonInterface(*args):
             grid[i, j].add_class('custom-size')
             
     text = widgets.Text("")
-    text.on_submit(setup_autocomplete(grid, algos=args))
+    text.on_submit(setup_autocomplete(getPredictions, grid, algos=args))
     text.add_class('custom-size')
     
     display(text)
     display(grid)
+
+### Functions oganize text to data structure usable in python
+
+def data_file_to_sentences(data :str) -> list:
+    """
+    Removes punctuation from a string and split into sentences
+    
+    Parameters:
+        data (str):The string which is to be unpontuated.
+
+    Returns:
+        (list):The list of sentence terminate by a dot.
+    """
+    return (
+        data.lower()
+        .replace("\r", " ")
+        .replace("\n", " ")
+        .replace("?", ".")
+        .replace("!", ".")
+        .replace('"', ".")
+        .replace("‘", " ")
+        .replace("-", " ")
+        .replace("’", " ")
+        .replace("'", " ")
+        .split(".")
+    )
+
+def remove_empty_words(l :list) -> list:
+    """
+    Removes empty strings in a list
+    
+    Parameters:
+        l (list):The list with empty strings.
+
+    Returns:
+        (list):The list without empty strings.
+    """
+    return list(filter(lambda a: a != "", l))
+
+def update_occ(d :dict, seq :str, w :str) -> None:
+    """
+    Append an occurence in the dict for the w after a seq.
+    It increment it if the word has been already view after seq
+    
+    Parameters:
+        d(dictr):
+            The dict containing the data of all occurences.
+        seq(str):
+            The sequece for which a new word appears after
+        w(str):
+            The word which appear after the seq
+    """
+    if seq not in d:
+        d[seq] = {}
+    if w not in d[seq]:
+        d[seq][w] = 0
+    d[seq][w] = d[seq][w] + 1
+    
+def gen_random_from_tbl(t :dict) -> str:
+    """
+    Get a random word from a dict containing tuples with
+    word and number of appearances.
+    
+    Parameters:
+        t (dict):
+            The the dict containing the words and their
+            number of appearance in the training set.
+
+    Returns:
+        (str):The random word choosen.
+    """
+    return random.choices(list(t.keys()), weights=list(t.values()))[0]
