@@ -19,10 +19,36 @@ import typing
 DistanceFunctionVar = typing.TypeVar('DistanceFunctionVar', bound=typing.Callable[[str], typing.Callable[[str], float]])
 PreTrainedPredictionVar =typing.TypeVar('PreTrainedPredictionVar', bound=typing.Callable[[typing.Callable[[str], typing.Callable[[str], float]], str, typing.Optional[str], typing.Optional[typing.Callable[[float], float]]], typing.Tuple[pd.DataFrame, float]])
 
+custom_size = typing.TypeVar('custom_size', None, HTML)
 
-"""Store the htrml elemnt for the widgets font size"""
-custom_size :HTML = None
-
+azerty_around_letter = { "a":["z", "s", "q"],
+                        "z": ["a", "e", "d", "s", "q"],
+                        "e": ["z", "r", "f", "d", "s"],
+                        "r": ["e", "t", "g", "f", "d"],
+                        "t": ["r", "y", "h", "g", "f"],
+                        "y": ["t", "u", "j", "h", "g"],
+                        "u": ["y", "i", "k", "j", "h"],
+                        "i": ["u", "o", "l", "k", "j"],
+                        "o": ["i", "p", "m", "l", "k"],
+                        "p": ["o", "m", "l"],
+                        "q":["a", "z", "s", "x", "w"],
+                        "s": ["z", "e", "d", "q", "x", "w"],
+                        "d": ["e", "r", "f", "s", "x", "d"],
+                        "f": ["e", "t", "g", "d", "c", "v"],
+                        "g": ["r", "y", "h", "f", "v", "b"],
+                        "h": ["t", "u", "j", "g", 'b', 'n'],
+                        "j": ["y", "i", "k", "h", "j"],
+                        "k": ["u", "o", "l", "j"],
+                        "l": ["i", "p", "m", "k"],
+                        "m": ["o", "p", "l"],
+                        "w": ["q", "s", "x"],
+                        "x": ["s", "d", "c", "w"],
+                        "c": ["d", "f", "x", "v"],
+                        "v": ["f", "g", "c", "b"],
+                        "b": ["g", "h", "v", "n"],
+                        "n": ["b", "h", "j"]
+                       }
+                              
 def setWidgetTextSize(value :int) -> None:
     """
     Set the size of text widget to he a better render
@@ -131,10 +157,31 @@ def chrono(fonction :typing.Callable[[list, dict], typing.Tuple[typing.Any, floa
 
 def getPredictionsFromDict(word_dict :pd.DataFrame) -> PreTrainedPredictionVar:
     @chrono
-    def getPredictions(funct :DistanceFunctionVar, word :str, start :str ="", mofier_funct : typing.Callable[[float], float] =lambda x: x) -> pd.DataFrame:
+    def getPredictions(funct :typing.Callable[[str], DistanceFunctionVar], word :str, start :str ="", mofier_funct : typing.Callable[[float], float] =lambda x: x) -> pd.DataFrame:
         word = word.lower()
         start = start.lower()
         f = funct(word)
+
+        mask = word_dict["ortho"].str.startswith(start) == True
+        word_dict_affinity = word_dict[
+            mask
+        ].apply(
+            lambda x: pd.Series(
+                [x["ortho"], mofier_funct(f(x["ortho"]))], index=["ortho", "affinity"]
+            ),
+            axis=1,
+        )
+
+        results = word_dict_affinity.nsmallest(3, "affinity", keep="first")
+        return results
+    return getPredictions
+
+
+def getPredictionsFromDictForPreParamFunction(word_dict :pd.DataFrame) -> PreTrainedPredictionVar:
+    @chrono
+    def getPredictions(funct :DistanceFunctionVar, start :str="", mofier_funct : typing.Callable[[float], float] =lambda x: x) -> pd.DataFrame:
+        start = start.lower()
+        f = funct
 
         mask = word_dict["ortho"].str.startswith(start) == True
         word_dict_affinity = word_dict[
@@ -250,7 +297,7 @@ def showLevensteinTable(title_text :str, c1 :str, c2 :str, data : typing.List[ty
 
     plt.axis("off")
     ax.set_title(title_text)
-    #plt.savefig(title_text.replace(" ", "_") + ".png")
+    #plt.savefig(title_text.replace(" ", "_") + ".png", bbox_inches='tight')
     plt.show()
 
 
@@ -268,7 +315,7 @@ def showJaroTable(title_text :str, c1 :str, c2 :str, Winkler :bool =False, **kwa
             The word to compare
         Winkler (bool):
             If it needs to display calcs associated to the distance Jaro-Winkler
-        kwargs (typing.Dict[str, typing.Any]):
+        kwargs (typing.Dict[str, AnyType]):
             Additional settings for the winkler calcs
             p (float):
                 The number p used by buy the algorythm Jaro-Winkler
@@ -405,7 +452,7 @@ def showJaroTable(title_text :str, c1 :str, c2 :str, Winkler :bool =False, **kwa
     ax[0].axis("off")
     ax[1].axis("off")
     ax[0].set_title(title_text)
-    #plt.savefig(title_text.replace(" ", "_") + ".png")
+    #plt.savefig(title_text.replace(" ", "_") + ".png", bbox_inches='tight')
     plt.show()
     
 
@@ -414,9 +461,9 @@ def assign_label_to_func(getPredictions :PreTrainedPredictionVar, f :DistanceFun
     Assign a function to a group of label and apply a getPrediction function to search 3 best words
     
     Parameters:
-        getPredictions (typing.Callable[[typing.Callable[[str], typing.Callable[[str], float]], str, typing.Optional[str], typing.Optional[typing.Callable[[float], float]]], typing.Tuple[pd.DataFrame, float]]):
+        getPredictions (PreTrainedPredictionVar):
             The fonction getPrediction already configured with a dict
-        f (typing.Callable[[str], typing.Callable[[str], float]]):
+        f (DistanceFunctionVar):
             The function to calculate a distance between 2 word
 
     Returns:
@@ -533,6 +580,7 @@ def data_file_to_sentences(data :str) -> list:
     """
     return (
         data.lower()
+        .replace("...", ".")
         .replace("\r", " ")
         .replace("\n", " ")
         .replace("?", ".")
@@ -542,6 +590,7 @@ def data_file_to_sentences(data :str) -> list:
         .replace("-", " ")
         .replace("’", " ")
         .replace("'", " ")
+        .replace(",", " ")
         .split(".")
     )
 
@@ -590,3 +639,22 @@ def gen_random_from_tbl(t :dict) -> str:
         (str):The random word choosen.
     """
     return random.choices(list(t.keys()), weights=list(t.values()))[0]
+
+
+def create_progress_bar_training_markov(sentences :list) -> widgets.IntProgress:
+    """
+    Create a progressbar for the data to train our markov chain model
+    """
+    nb_words = sum([len(remove_empty_words(i.split(" "))) for i in sentences])
+    print(nb_words)
+    pbar = widgets.IntProgress(
+        value=0,
+        min=0,
+        max=nb_words,
+        description="Create markov model:",
+        bar_style="info",  # 'success', 'info', 'warning', 'danger' or ''
+        style={"bar_color": "blue"},
+        orientation="horizontal",
+    )
+    display(pbar)
+    return pbar

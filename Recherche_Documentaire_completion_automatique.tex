@@ -135,6 +135,24 @@
 
 \chapter{Étude des algorithmes de calcul de distance, par exemple de distance d’édition.}
 
+
+\begin{figure}
+    \centering
+    \begin{subfigure}{0.4\textwidth}
+        \includegraphics[width=.90\textwidth]{img/Tableau_de_Levenshtein.png}
+        \caption{Tableau de Levensthein}
+        \label{fig:tab_levensthein}
+    \end{subfigure}
+    \begin{subfigure}{0.4\textwidth}
+        \includegraphics[width=.90\textwidth]{img/Tableau_de_Damerau-Levenshtein.png}
+        \caption{Tableau de Damerau-Levensthein}
+        \label{fig:tab_damerau}
+    \end{subfigure}
+    \caption{Algorithme type Levensthein}
+    \label{fig:algo_levensthein}
+\end{figure}
+    
+
 \section{Algorithme de Levenshtein}
 
     L'algorithme de levensthein permet de calculer la distance entre deux chaînes.
@@ -178,21 +196,22 @@ Voici ci-dessous un exemple d'utilisation de l'algorithme de Levenstein pour cal
     
     Ces opérations forment environ 80\% des fautes d'orthographes humaines.
     On a donc un algorithme de correction orthographique qui est assez efficace mais on est encore loin d'avoir la perfection.
-    \begin{figure}
-        \centering
-        \begin{subfigure}{0.4\textwidth}
-            \includegraphics[height=0.4\textheight]{img/Tableau_de_Levenshtein.png}
-            \caption{Tableau de Levensthein}
-            \label{fig:tab_levensthein}
-        \end{subfigure}
-        \begin{subfigure}{0.4\textwidth}
-            \includegraphics[height=0.4\textheight]{img/Tableau_de_Damerau-Levenshtein.png}
-            \caption{Tableau de Damerau-Levensthein}
-            \label{fig:tab_damerau}
-        \end{subfigure}
-        \caption{Algorithme type Levensthein}
-        \label{fig:algo_levensthein}
-    \end{figure}
+    
+\begin{figure}
+    \centering
+    \begin{subfigure}{0.4\textwidth}
+        \includegraphics[width=.90\textwidth]{img/Table_de_Jaro.png}
+        \caption{Tableau de Jaro}
+        \label{fig:tab_jaro}
+    \end{subfigure}
+    \begin{subfigure}{0.4\textwidth}
+        \includegraphics[width=.90\textwidth]{img/Table_de_Jaro-Winkler.png}
+        \caption{Tableau de Jaro-Winkler}
+        \label{fig:tab_winkler}
+    \end{subfigure}
+    \caption{Algorithme type Levensthein}
+    \label{fig:algo_jaro}
+\end{figure}
     
 \section{Algorithme de Jaro\cite{noauthor_distance_2021}}
     
@@ -267,8 +286,14 @@ La somme des probabilités de chaque ligne doit être égale à 1 ce qui impliqu
 Les chaînes de Markov sont utilisées dans beaucoup de domaines, par exemple, les chaînes de Markov sont utilisées par Google pour déterminer l'indice de popularité d'une page web à partir d'un état quelconque de la chaîne de Markov représentant le Web.\\
 \\
 Dans le cas du sujet vu qu'un texte est une suite de mots, on pourrait partir du principe qu'un mot est un état.
-Si on se sert de chaque saisie d'utilisateur pour compléter des chaînes de Markov associées on pourrait déterminer quels sont les mots les plus fréquemment utilisés à la suite d'un autre et ainsi faire des propositions intéressantes car se basant sur la fréquence.\\
-\includegraphics[scale=1]{img/Mark.png}\\
+Si on se sert de chaque saisie d'utilisateur pour compléter des chaînes de Markov associées on pourrait déterminer quels sont les mots les plus fréquemment utilisés à la suite d'un autre et ainsi faire des propositions intéressantes car se basant sur la fréquence.
+\begin{figure}[h]
+    \centering
+    \includegraphics[scale=1]{img/Mark.png}
+    \caption{Les chaines de Markov avec les mots}
+    \label{fig:chaine_markov_word}
+\end{figure}
+
 Cependant cette approche a des limites comme l'absence de mémoire qui empêche d'affiner la recommandation de mots car cette dernière se base sur uniquement un seul mot et non l'ensemble de la phrase qui précède.
 \chapter{Programmer un petit outil de ce type en s’appuyant sur différentes techniques.}
 %Parler de pourquoi on a choisis de faire comme on a fait
@@ -276,4 +301,3 @@ Cependant cette approche a des limites comme l'absence de mémoire qui empêche 
 \printbibliography
 
 \end{document}
-
