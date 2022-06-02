@@ -156,8 +156,42 @@ def chrono(fonction :typing.Callable[[list, dict], typing.Tuple[typing.Any, floa
     return wrapper
 
 def getPredictionsFromDict(word_dict :pd.DataFrame) -> PreTrainedPredictionVar:
+    """
+    Get a prediction function with the given dictionnary.
+    
+    Parameters:
+        data (pandas.DataFrame):
+            A dataframe containing a colulmn 'ortho' and store a big number of words.
+
+    Returns:
+        (PreTrainedPredictionVar):
+            A function that compare words with a given function and return the best 3 results.
+    """
     @chrono
-    def getPredictions(funct :typing.Callable[[str], DistanceFunctionVar], word :str, start :str ="", mofier_funct : typing.Callable[[float], float] =lambda x: x) -> pd.DataFrame:
+    def getPredictions(funct :typing.Callable[[str], DistanceFunctionVar], word :str, start :str ="", modifier_funct : typing.Callable[[float], float] =lambda x: x) -> pd.DataFrame:
+        """
+        Compare all words from word_dictwith word using function funct.
+        It takes the 3 lowest word calculated by funct.
+        It ca be mofied with modifier_funct to reverse order for example
+        
+        Parameters:
+            funct (typing.Callable[[str], DistanceFunctionVar]):
+                The function to calculate distance like levenshtein distance.
+            word (str):
+                The word to compare to all other words in database.
+                It use funct to get a number to compare them
+            start (str):
+                The begining of words in database to compare to word.
+                For example if you put the 2 first letter of your correct word then it will compare only to words with same begining.
+                With that you can earn efficiency. If you put 2 letter with the given database the search is made for only 336000/26^2 = 500 words to compare.
+            modifier_funct(typing.Callable[[float], float]):
+                It can modify the output of the distance function.
+                For some function less is better and other higth is better. So we decided to make the lower is better and for the other function you need to give a function to get the opposite result
+        
+        Returns:
+            (pandas.DataFrame):
+                A empty dataframe or a dataframr with the 3 best words given by funct.
+        """
         word = word.lower()
         start = start.lower()
         f = funct(word)
@@ -167,33 +201,16 @@ def getPredictionsFromDict(word_dict :pd.DataFrame) -> PreTrainedPredictionVar:
             mask
         ].apply(
             lambda x: pd.Series(
-                [x["ortho"], mofier_funct(f(x["ortho"]))], index=["ortho", "affinity"]
+                [x["ortho"], modifier_funct(f(x["ortho"]))], index=["ortho", "affinity"]
             ),
             axis=1,
         )
-
-        results = word_dict_affinity.nsmallest(3, "affinity", keep="first")
-        return results
-    return getPredictions
-
-
-def getPredictionsFromDictForPreParamFunction(word_dict :pd.DataFrame) -> PreTrainedPredictionVar:
-    @chrono
-    def getPredictions(funct :DistanceFunctionVar, start :str="", mofier_funct : typing.Callable[[float], float] =lambda x: x) -> pd.DataFrame:
-        start = start.lower()
-        f = funct
-
-        mask = word_dict["ortho"].str.startswith(start) == True
-        word_dict_affinity = word_dict[
-            mask
-        ].apply(
-            lambda x: pd.Series(
-                [x["ortho"], mofier_funct(f(x["ortho"]))], index=["ortho", "affinity"]
-            ),
-            axis=1,
-        )
-
-        results = word_dict_affinity.nsmallest(3, "affinity", keep="first")
+        if (len(word_dict_affinity) > 3):
+            results = word_dict_affinity.nsmallest(3, "affinity", keep="first")
+        else:
+            results = pd.DataFrame(columns=['ortho', 'affinity'])
+            results['ortho'] = ["", "", ""]
+            results['affinity'] = [100, 100, 100]
         return results
     return getPredictions
 
@@ -488,7 +505,7 @@ def assign_label_to_func(getPredictions :PreTrainedPredictionVar, f :DistanceFun
             return
 
         res, time_elapsed = getPredictions(
-            f, word=word, start=word[:2], mofier_funct=modifier
+            f, word=word, start=word[:2], modifier_funct=modifier
         )
 
         res = list(res["ortho"].values)
@@ -498,7 +515,13 @@ def assign_label_to_func(getPredictions :PreTrainedPredictionVar, f :DistanceFun
     return funct
 
 
-def setup_autocomplete(getPredictions :PreTrainedPredictionVar, grid :widgets.GridspecLayout, algos :typing.Sequence[DistanceFunctionVar]) -> typing.Callable[[widgets.widget_string.Text], None]:
+def _setup_autocomplete(getPredictions :PreTrainedPredictionVar, grid :widgets.GridspecLayout, algos :typing.Sequence[DistanceFunctionVar]) -> typing.Callable[[widgets.widget_string.Text], None]:
+    """
+    Link a DistanceFunctionVar to a column in a gridWidget and return a function to call it for comapare the word to ohter
+    and show result diretly in the grid.
+    
+    This process is made in multiprocess so wee need to pass result in a shared dict.
+    """
     funct_list = list()
     for index, algo in enumerate(algos):
         funct_list.append(assign_label_to_func(getPredictions, algo, index+1))
@@ -533,9 +556,31 @@ def setup_autocomplete(getPredictions :PreTrainedPredictionVar, grid :widgets.Gr
     return funct
 
 def displayComparaisonInterface(getPredictions :PreTrainedPredictionVar, *args :typing.Sequence[DistanceFunctionVar]):
+    """
+    Create a dynamic table to show best words propose by each algorithm.
+    Shows results when they have one.
+    
+    Parameters:
+        getPredictions (PreTrainedPredictionVar):
+            A pretrained getPredictionsFromDict function to use with distance algorithms.
+        *args  (DistanceFunctionVar):
+            All distance function to compare.
+        
+    """
     grid = widgets.GridspecLayout(len(args)+1, 5)
     
     def formatAlgoName(funct):
+        """ 
+        Format a function name to get the name of it's algorithm
+        
+        Parameters:
+            funct (function):
+                The function to get the algorithm name.
+
+        Returns:
+            (string): 
+                The string name of the algorithm
+        """
         import regex as re
         name = funct.__name__
         name = name.replace("DistanceDe", '')
@@ -560,7 +605,7 @@ def displayComparaisonInterface(getPredictions :PreTrainedPredictionVar, *args :
             grid[i, j].add_class('custom-size')
             
     text = widgets.Text("")
-    text.on_submit(setup_autocomplete(getPredictions, grid, algos=args))
+    text.on_submit(_setup_autocomplete(getPredictions, grid, algos=args))
     text.add_class('custom-size')
     
     display(text)
@@ -646,7 +691,6 @@ def create_progress_bar_training_markov(sentences :list) -> widgets.IntProgress:
     Create a progressbar for the data to train our markov chain model
     """
     nb_words = sum([len(remove_empty_words(i.split(" "))) for i in sentences])
-    print(nb_words)
     pbar = widgets.IntProgress(
         value=0,
         min=0,
